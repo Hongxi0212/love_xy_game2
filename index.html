@@ -1,0 +1,867 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>💕 接住小心心</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --pink: #ff8fab;
+    --pink-light: #ffc2d1;
+    --pink-deep: #ff4d6d;
+    --lavender: #c77dff;
+    --mint: #80ffdb;
+    --peach: #ffb347;
+    --cream: #fff0f3;
+    --sky: #a2d2ff;
+    --bg1: #ffeef8;
+    --bg2: #ffe0f0;
+    --shadow: rgba(255,100,150,0.25);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; touch-action: none; user-select: none; -webkit-user-select: none; }
+
+  body {
+    font-family: 'Nunito', sans-serif;
+    background: linear-gradient(160deg, #ffeef8 0%, #e8d5f5 50%, #d4eeff 100%);
+    min-height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  /* Floating clouds background */
+  .cloud {
+    position: fixed;
+    border-radius: 50px;
+    background: rgba(255,255,255,0.55);
+    animation: floatCloud linear infinite;
+    pointer-events: none;
+    z-index: 0;
+  }
+  @keyframes floatCloud {
+    from { transform: translateX(-200px); }
+    to { transform: translateX(calc(100vw + 200px)); }
+  }
+
+  /* Sparkle stars */
+  .sparkle {
+    position: fixed;
+    pointer-events: none;
+    z-index: 0;
+    animation: twinkle 2s ease-in-out infinite;
+  }
+  @keyframes twinkle {
+    0%, 100% { opacity: 0.2; transform: scale(0.8) rotate(0deg); }
+    50% { opacity: 1; transform: scale(1.2) rotate(20deg); }
+  }
+
+  /* ===== SCREENS ===== */
+  .screen {
+    position: fixed; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    z-index: 10;
+    transition: opacity 0.4s ease;
+  }
+  .screen.hidden { opacity: 0; pointer-events: none; }
+
+  /* START SCREEN */
+  #startScreen {
+    background: linear-gradient(160deg, #ffeef8cc, #e8d5f5cc);
+    backdrop-filter: blur(6px);
+  }
+
+  .game-title {
+    font-size: 2.6rem;
+    font-weight: 900;
+    color: var(--pink-deep);
+    text-shadow: 3px 3px 0px var(--pink-light), 6px 6px 0px rgba(255,100,150,0.15);
+    line-height: 1.2;
+    text-align: center;
+    animation: titleBounce 2s ease-in-out infinite;
+    margin-bottom: 6px;
+  }
+  @keyframes titleBounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-8px); }
+  }
+
+  .subtitle {
+    font-size: 1rem;
+    color: var(--lavender);
+    font-weight: 700;
+    text-align: center;
+    margin-bottom: 40px;
+    opacity: 0.9;
+  }
+
+  .love-note {
+    background: white;
+    border: 3px solid var(--pink-light);
+    border-radius: 24px;
+    padding: 20px 28px;
+    max-width: 320px;
+    text-align: center;
+    box-shadow: 0 8px 32px var(--shadow);
+    margin-bottom: 36px;
+    position: relative;
+  }
+  .love-note::before {
+    content: '💌';
+    position: absolute;
+    top: -18px; left: 50%;
+    transform: translateX(-50%);
+    font-size: 2rem;
+  }
+  .love-note p {
+    color: #c06080;
+    font-size: 0.95rem;
+    line-height: 1.7;
+    font-weight: 700;
+  }
+
+  .btn-start {
+    background: linear-gradient(135deg, var(--pink-deep), var(--lavender));
+    color: white;
+    border: none;
+    border-radius: 50px;
+    padding: 18px 56px;
+    font-size: 1.3rem;
+    font-weight: 900;
+    font-family: 'Nunito', sans-serif;
+    cursor: pointer;
+    box-shadow: 0 6px 24px rgba(255,77,109,0.4), 0 0 0 4px rgba(255,100,150,0.15);
+    transition: transform 0.15s, box-shadow 0.15s;
+    animation: pulsBtn 2s ease-in-out infinite;
+  }
+  @keyframes pulsBtn {
+    0%, 100% { box-shadow: 0 6px 24px rgba(255,77,109,0.4), 0 0 0 4px rgba(255,100,150,0.15); }
+    50% { box-shadow: 0 6px 32px rgba(255,77,109,0.6), 0 0 0 12px rgba(255,100,150,0.08); }
+  }
+  .btn-start:active { transform: scale(0.95); }
+
+  /* HUD */
+  #hud {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 20;
+    padding: 16px 20px 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: linear-gradient(to bottom, rgba(255,238,248,0.92), transparent);
+    pointer-events: none;
+  }
+  #hud.hidden { display: none; }
+
+  .hud-box {
+    background: white;
+    border: 2.5px solid var(--pink-light);
+    border-radius: 20px;
+    padding: 8px 16px;
+    box-shadow: 0 4px 12px var(--shadow);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .hud-label {
+    font-size: 0.7rem;
+    color: var(--pink);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .hud-val {
+    font-size: 1.4rem;
+    font-weight: 900;
+    color: var(--pink-deep);
+    min-width: 36px;
+    text-align: center;
+  }
+
+  .hearts-display { display: flex; gap: 3px; }
+  .heart-icon { font-size: 1.3rem; transition: transform 0.2s; }
+  .heart-icon.lost { filter: grayscale(1); opacity: 0.3; transform: scale(0.85); }
+
+  /* GAME CANVAS AREA */
+  #gameArea {
+    position: fixed;
+    inset: 0;
+    overflow: hidden;
+    z-index: 5;
+  }
+  #gameArea.hidden { display: none; }
+
+  /* Falling items */
+  .item {
+    position: absolute;
+    font-size: 2.2rem;
+    pointer-events: none;
+    animation: fall linear forwards;
+    filter: drop-shadow(0 3px 6px rgba(0,0,0,0.12));
+    transform-origin: center;
+  }
+  @keyframes fall {
+    from { top: -60px; transform: rotate(-15deg) scale(1); }
+    to { top: 110vh; transform: rotate(15deg) scale(0.9); }
+  }
+
+  /* Player basket */
+  #player {
+    position: absolute;
+    bottom: 60px;
+    width: 88px;
+    height: 88px;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    pointer-events: none;
+    z-index: 15;
+    transition: left 0.05s linear;
+  }
+
+  .player-char {
+    font-size: 3.4rem;
+    line-height: 1;
+    filter: drop-shadow(0 4px 8px rgba(255,100,150,0.4));
+    animation: charBob 1.2s ease-in-out infinite;
+  }
+  @keyframes charBob {
+    0%, 100% { transform: translateY(0) scale(1); }
+    50% { transform: translateY(-5px) scale(1.05); }
+  }
+
+  .catch-zone {
+    width: 80px;
+    height: 14px;
+    background: linear-gradient(135deg, var(--pink), var(--pink-deep));
+    border-radius: 50px;
+    box-shadow: 0 4px 16px rgba(255,77,109,0.5);
+    margin-top: -6px;
+    position: relative;
+  }
+  .catch-zone::after {
+    content: '';
+    position: absolute;
+    inset: 3px 8px;
+    background: rgba(255,255,255,0.3);
+    border-radius: 50px;
+  }
+
+  /* Catch burst effect */
+  .burst {
+    position: absolute;
+    font-size: 1.6rem;
+    pointer-events: none;
+    z-index: 30;
+    animation: burstAnim 0.65s ease-out forwards;
+  }
+  @keyframes burstAnim {
+    0% { opacity: 1; transform: translateY(0) scale(0.5); }
+    60% { opacity: 1; transform: translateY(-40px) scale(1.3); }
+    100% { opacity: 0; transform: translateY(-70px) scale(0.7); }
+  }
+
+  .score-pop {
+    position: absolute;
+    font-size: 1.1rem;
+    font-weight: 900;
+    font-family: 'Nunito', sans-serif;
+    pointer-events: none;
+    z-index: 30;
+    animation: scorePop 0.8s ease-out forwards;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.15);
+  }
+  @keyframes scorePop {
+    0% { opacity: 1; transform: translateY(0) scale(1); }
+    100% { opacity: 0; transform: translateY(-60px) scale(1.4); }
+  }
+
+  /* Shake animation */
+  @keyframes shake {
+    0%, 100% { transform: translateX(-50%); }
+    20% { transform: translateX(calc(-50% - 12px)); }
+    40% { transform: translateX(calc(-50% + 12px)); }
+    60% { transform: translateX(calc(-50% - 8px)); }
+    80% { transform: translateX(calc(-50% + 8px)); }
+  }
+  #player.shake { animation: shake 0.4s ease; }
+
+  /* Ground */
+  #ground {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    height: 60px;
+    background: linear-gradient(to top, rgba(255,180,210,0.4), transparent);
+    pointer-events: none;
+    z-index: 4;
+  }
+
+  /* GAME OVER SCREEN */
+  #gameOverScreen {
+    background: rgba(255,238,248,0.92);
+    backdrop-filter: blur(10px);
+  }
+
+  .over-card {
+    background: white;
+    border: 3px solid var(--pink-light);
+    border-radius: 32px;
+    padding: 32px 36px;
+    max-width: 320px;
+    width: 88vw;
+    text-align: center;
+    box-shadow: 0 12px 48px var(--shadow);
+    animation: cardPop 0.4s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  @keyframes cardPop {
+    from { transform: scale(0.7); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+  }
+
+  .over-emoji { font-size: 3.5rem; margin-bottom: 8px; display: block; }
+  .over-title {
+    font-size: 1.8rem; font-weight: 900;
+    color: var(--pink-deep);
+    margin-bottom: 6px;
+  }
+  .over-sub { color: #c06080; font-size: 0.9rem; margin-bottom: 20px; font-weight: 700; }
+
+  .stat-row {
+    display: flex; justify-content: space-around;
+    margin: 16px 0 24px;
+    gap: 12px;
+  }
+  .stat {
+    flex: 1;
+    background: var(--cream);
+    border-radius: 16px;
+    padding: 12px 8px;
+    border: 2px solid var(--pink-light);
+  }
+  .stat-num { font-size: 1.8rem; font-weight: 900; color: var(--pink-deep); }
+  .stat-lbl { font-size: 0.72rem; color: var(--pink); font-weight: 700; }
+
+  .btn-row { display: flex; gap: 12px; }
+  .btn-again {
+    flex: 1;
+    background: linear-gradient(135deg, var(--pink-deep), var(--lavender));
+    color: white; border: none; border-radius: 50px;
+    padding: 16px; font-size: 1rem; font-weight: 900;
+    font-family: 'Nunito', sans-serif; cursor: pointer;
+    box-shadow: 0 4px 16px rgba(255,77,109,0.35);
+  }
+  .btn-again:active { transform: scale(0.96); }
+
+  /* Level up toast */
+  #lvlToast {
+    position: fixed;
+    top: 100px; left: 50%;
+    transform: translateX(-50%) translateY(-20px);
+    background: linear-gradient(135deg, var(--peach), var(--pink));
+    color: white;
+    border-radius: 50px;
+    padding: 12px 28px;
+    font-size: 1rem; font-weight: 900;
+    font-family: 'Nunito', sans-serif;
+    box-shadow: 0 6px 20px rgba(255,150,50,0.4);
+    z-index: 50;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s, transform 0.3s;
+  }
+  #lvlToast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  /* Combo display */
+  #comboDisplay {
+    position: fixed;
+    top: 130px; right: 20px;
+    z-index: 25;
+    text-align: right;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  #comboDisplay.show { opacity: 1; }
+  .combo-num {
+    font-size: 2.2rem; font-weight: 900;
+    color: var(--peach);
+    text-shadow: 0 2px 8px rgba(255,150,50,0.5);
+    animation: comboSpin 0.3s ease;
+  }
+  @keyframes comboSpin {
+    0% { transform: scale(0.6) rotate(-10deg); }
+    100% { transform: scale(1) rotate(0deg); }
+  }
+  .combo-label { font-size: 0.75rem; color: var(--pink); font-weight: 700; }
+
+  /* Safe area padding */
+  #hud { padding-top: max(16px, env(safe-area-inset-top, 16px)); }
+
+  /* Flower decorations */
+  .deco {
+    position: fixed;
+    font-size: 1.6rem;
+    pointer-events: none;
+    z-index: 1;
+    animation: decoFloat 4s ease-in-out infinite;
+    opacity: 0.5;
+  }
+  @keyframes decoFloat {
+    0%, 100% { transform: translateY(0) rotate(0deg); }
+    50% { transform: translateY(-12px) rotate(10deg); }
+  }
+
+  /* ===== INSTRUCTIONS ===== */
+  .how-to {
+    display: flex; gap: 16px; justify-content: center;
+    margin-bottom: 24px;
+  }
+  .how-item {
+    display: flex; flex-direction: column; align-items: center;
+    gap: 4px;
+  }
+  .how-icon { font-size: 1.8rem; }
+  .how-desc { font-size: 0.68rem; color: #c06080; font-weight: 700; text-align: center; }
+</style>
+</head>
+<body>
+
+<!-- Background decorations -->
+<div class="deco" style="top:10%;left:5%;animation-delay:0s">🌸</div>
+<div class="deco" style="top:20%;right:8%;animation-delay:1s">🌷</div>
+<div class="deco" style="bottom:25%;left:3%;animation-delay:2s">🌼</div>
+<div class="deco" style="bottom:15%;right:5%;animation-delay:0.5s">🌺</div>
+<div class="deco" style="top:45%;left:2%;animation-delay:1.5s">✨</div>
+<div class="deco" style="top:60%;right:3%;animation-delay:3s">⭐</div>
+
+<!-- Sparkle stars -->
+<div class="sparkle" style="top:15%;left:20%;animation-delay:0.3s">✦</div>
+<div class="sparkle" style="top:30%;right:18%;animation-delay:1.1s">✦</div>
+<div class="sparkle" style="top:55%;left:12%;animation-delay:0.7s">✦</div>
+<div class="sparkle" style="top:70%;right:22%;animation-delay:1.8s">✦</div>
+
+<!-- START SCREEN -->
+<div class="screen" id="startScreen">
+  <div class="game-title">💕 接住给你的爱心</div>
+  <div class="subtitle">别被炸飞了哦</div>
+
+  <div class="love-note">
+    <p>有小游戏陪着宝贝的话<br>就不会那么难过了吧<br>帮我接住所有的爱心吧 🥰</p>
+  </div>
+
+  <div class="how-to">
+    <div class="how-item">
+      <div class="how-icon">👆</div>
+      <div class="how-desc">滑动屏幕<br>移动小猫</div>
+    </div>
+    <div class="how-item">
+      <div class="how-icon">💖</div>
+      <div class="how-desc">接住爱心<br>得分</div>
+    </div>
+    <div class="how-item">
+      <div class="how-icon">💣</div>
+      <div class="how-desc">避开炸弹<br>别受伤</div>
+    </div>
+  </div>
+
+  <button class="btn-start" id="btnStart">开始游戏 ✨</button>
+</div>
+
+<!-- HUD -->
+<div id="hud" class="hidden">
+  <div class="hud-box">
+    <div>
+      <div class="hud-label">得分</div>
+      <div class="hud-val" id="scoreDisplay">0</div>
+    </div>
+  </div>
+  <div class="hud-box">
+    <div class="hud-label" style="text-align:center;margin-bottom:3px">生命</div>
+    <div class="hearts-display" id="heartsDisplay">
+      <span class="heart-icon">❤️</span>
+      <span class="heart-icon">❤️</span>
+      <span class="heart-icon">❤️</span>
+    </div>
+  </div>
+  <div class="hud-box">
+    <div>
+      <div class="hud-label">最高</div>
+      <div class="hud-val" id="bestDisplay">0</div>
+    </div>
+  </div>
+</div>
+
+<!-- GAME AREA -->
+<div id="gameArea" class="hidden">
+  <div id="ground"></div>
+  <div id="player">
+    <div class="player-char">🐱</div>
+    <div class="catch-zone"></div>
+  </div>
+</div>
+
+<!-- Level up toast -->
+<div id="lvlToast">🌟 升级啦！速度加快！</div>
+
+<!-- Combo display -->
+<div id="comboDisplay">
+  <div class="combo-num" id="comboNum">x2</div>
+  <div class="combo-label">COMBO!</div>
+</div>
+
+<!-- GAME OVER SCREEN -->
+<div class="screen hidden" id="gameOverScreen">
+  <div class="over-card">
+    <span class="over-emoji" id="overEmoji">😿</span>
+    <div class="over-title" id="overTitle">游戏结束</div>
+    <div class="over-sub" id="overSub">你太棒了！</div>
+    <div class="stat-row">
+      <div class="stat">
+        <div class="stat-num" id="finalScore">0</div>
+        <div class="stat-lbl">本次得分</div>
+      </div>
+      <div class="stat">
+        <div class="stat-num" id="finalBest">0</div>
+        <div class="stat-lbl">最高记录</div>
+      </div>
+      <div class="stat">
+        <div class="stat-num" id="finalCaught">0</div>
+        <div class="stat-lbl">接住爱心</div>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn-again" id="btnRestart">再玩一次 💕</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ============== GAME ENGINE ==============
+  const player = document.getElementById('player');
+  const gameArea = document.getElementById('gameArea');
+  const hud = document.getElementById('hud');
+  const startScreen = document.getElementById('startScreen');
+  const gameOverScreen = document.getElementById('gameOverScreen');
+  const scoreDisplay = document.getElementById('scoreDisplay');
+  const bestDisplay = document.getElementById('bestDisplay');
+  const heartsDisplay = document.getElementById('heartsDisplay');
+  const lvlToast = document.getElementById('lvlToast');
+  const comboDisplay = document.getElementById('comboDisplay');
+  const comboNum = document.getElementById('comboNum');
+
+  let score = 0, bestScore = 0, lives = 3, level = 1;
+  let playerX, catchedHearts = 0, combo = 0;
+  let spawnTimer, diffTimer, comboTimer;
+  let gameRunning = false;
+  let items = [];
+
+  const W = window.innerWidth;
+  const H = window.innerHeight;
+
+  // Item types: emoji, points, isBad, size
+  const goodItems = [
+    { e: '💖', pts: 10 },
+    { e: '💗', pts: 10 },
+    { e: '💝', pts: 15 },
+    { e: '💕', pts: 12 },
+    { e: '🌟', pts: 20 },
+    { e: '⭐', pts: 18 },
+    { e: '💎', pts: 25 },
+    { e: '🍬', pts: 8 },
+    { e: '🍭', pts: 8 },
+    { e: '🎀', pts: 15 },
+    { e: '🌸', pts: 10 },
+  ];
+  const badItems = [
+    { e: '💣', pts: 0 },
+    { e: '🌩️', pts: 0 },
+    { e: '😈', pts: 0 },
+  ];
+
+  function startGame() {
+    score = 0; lives = 3; level = 1; combo = 0; catchedHearts = 0;
+    playerX = W / 2;
+    items = [];
+    gameRunning = true;
+
+    // Clear previous items
+    document.querySelectorAll('.item, .burst, .score-pop').forEach(e => e.remove());
+
+    startScreen.classList.add('hidden');
+    gameOverScreen.classList.add('hidden');
+    hud.classList.remove('hidden');
+    gameArea.classList.remove('hidden');
+
+    updateHUD();
+    player.style.left = playerX + 'px';
+
+    scheduleSpawn();
+    startDiffRamp();
+  }
+
+  function scheduleSpawn() {
+    if (!gameRunning) return;
+    const delay = Math.max(400, 1100 - level * 60);
+    spawnTimer = setTimeout(() => {
+      spawnItem();
+      scheduleSpawn();
+    }, delay + Math.random() * 300);
+  }
+
+  function startDiffRamp() {
+    diffTimer = setInterval(() => {
+      if (!gameRunning) return;
+      if (score >= level * 80 && level < 10) {
+        level++;
+        showLevelUp();
+      }
+    }, 1000);
+  }
+
+  function spawnItem() {
+    const isBad = Math.random() < Math.min(0.12 + level * 0.025, 0.32);
+    const pool = isBad ? badItems : goodItems;
+    const type = pool[Math.floor(Math.random() * pool.length)];
+
+    const el = document.createElement('div');
+    el.classList.add('item');
+    el.textContent = type.e;
+
+    const x = 30 + Math.random() * (W - 60);
+    const dur = Math.max(1.5, 3.8 - level * 0.22);
+
+    el.style.left = x + 'px';
+    el.style.animationDuration = dur + 's';
+    el.style.fontSize = (2 + Math.random() * 0.6) + 'rem';
+    el.dataset.pts = type.pts;
+    el.dataset.bad = isBad ? '1' : '0';
+    el.dataset.x = x;
+
+    gameArea.appendChild(el);
+    items.push(el);
+
+    el.addEventListener('animationend', () => {
+      el.remove();
+      items = items.filter(i => i !== el);
+    });
+  }
+
+  // ============ COLLISION ============
+  function checkCollisions() {
+    if (!gameRunning) return;
+    requestAnimationFrame(checkCollisions);
+
+    const playerRect = {
+      x: playerX - 42,
+      y: H - 74,
+      w: 84,
+      h: 18
+    };
+
+    for (const item of [...items]) {
+      const rect = item.getBoundingClientRect();
+      const itemCX = rect.left + rect.width / 2;
+      const itemCY = rect.top + rect.height / 2;
+
+      if (
+        itemCX > playerRect.x &&
+        itemCX < playerRect.x + playerRect.w &&
+        itemCY > playerRect.y &&
+        itemCY < playerRect.y + playerRect.h + 12
+      ) {
+        const isBad = item.dataset.bad === '1';
+        const pts = parseInt(item.dataset.pts);
+        item.remove();
+        items = items.filter(i => i !== item);
+
+        if (isBad) {
+          onHitBad(item, itemCX, itemCY);
+        } else {
+          onCatch(item, pts, itemCX, itemCY);
+        }
+      }
+    }
+  }
+
+  function onCatch(item, pts, cx, cy) {
+    combo++;
+    catchedHearts++;
+    clearTimeout(comboTimer);
+
+    const multiplier = combo >= 5 ? 3 : combo >= 3 ? 2 : 1;
+    const gained = pts * multiplier;
+    score += gained;
+    updateHUD();
+
+    // Burst effect
+    spawnBurst(item.textContent, cx, cy - 30);
+    spawnScorePop('+' + gained + (multiplier > 1 ? '✕' + multiplier : ''), cx, cy - 50, '#ff4d6d');
+
+    // Show combo
+    if (combo >= 2) {
+      comboNum.textContent = '✕' + combo;
+      comboDisplay.classList.add('show');
+      comboNum.style.animation = 'none';
+      void comboNum.offsetWidth;
+      comboNum.style.animation = 'comboSpin 0.3s ease';
+    }
+
+    comboTimer = setTimeout(() => {
+      combo = 0;
+      comboDisplay.classList.remove('show');
+    }, 1800);
+  }
+
+  function onHitBad(item, cx, cy) {
+    combo = 0;
+    comboDisplay.classList.remove('show');
+    lives--;
+    updateHearts();
+    spawnBurst('💥', cx, cy - 20);
+
+    // Shake player
+    player.classList.remove('shake');
+    void player.offsetWidth;
+    player.classList.add('shake');
+    setTimeout(() => player.classList.remove('shake'), 400);
+
+    if (lives <= 0) {
+      endGame();
+    }
+  }
+
+  function spawnBurst(emoji, x, y) {
+    const el = document.createElement('div');
+    el.classList.add('burst');
+    el.textContent = emoji;
+    el.style.left = x + 'px';
+    el.style.top = y + 'px';
+    gameArea.appendChild(el);
+    setTimeout(() => el.remove(), 700);
+  }
+
+  function spawnScorePop(text, x, y, color) {
+    const el = document.createElement('div');
+    el.classList.add('score-pop');
+    el.textContent = text;
+    el.style.left = (x - 20) + 'px';
+    el.style.top = y + 'px';
+    el.style.color = color;
+    gameArea.appendChild(el);
+    setTimeout(() => el.remove(), 900);
+  }
+
+  // ============ TOUCH CONTROLS ============
+  document.addEventListener('touchmove', (e) => {
+    if (!gameRunning) return;
+    e.preventDefault();
+    const tx = e.touches[0].clientX;
+    playerX = Math.max(44, Math.min(W - 44, tx));
+    player.style.left = playerX + 'px';
+  }, { passive: false });
+
+  document.addEventListener('touchstart', (e) => {
+    if (!gameRunning) return;
+    const tx = e.touches[0].clientX;
+    playerX = Math.max(44, Math.min(W - 44, tx));
+    player.style.left = playerX + 'px';
+  }, { passive: false });
+
+  // ============ HUD ============
+  function updateHUD() {
+    scoreDisplay.textContent = score;
+    if (score > bestScore) bestScore = score;
+    bestDisplay.textContent = bestScore;
+  }
+
+  function updateHearts() {
+    const icons = heartsDisplay.querySelectorAll('.heart-icon');
+    icons.forEach((ic, i) => {
+      ic.classList.toggle('lost', i >= lives);
+    });
+  }
+
+  // ============ LEVEL UP ============
+  function showLevelUp() {
+    const msgs = [
+      '🌟 升级啦！速度加快！',
+      '💪 厉害哦！继续加油！',
+      '🎀 你好棒！Level ' + level + '！',
+      '🚀 快如闪电！难度+1！',
+      '👑 无敌小公主！',
+    ];
+    lvlToast.textContent = msgs[Math.min(level - 2, msgs.length - 1)];
+    lvlToast.classList.add('show');
+    setTimeout(() => lvlToast.classList.remove('show'), 2000);
+  }
+
+  // ============ GAME OVER ============
+  function endGame() {
+    gameRunning = false;
+    clearTimeout(spawnTimer);
+    clearInterval(diffTimer);
+
+    hud.classList.add('hidden');
+    gameArea.classList.add('hidden');
+
+    const messages = [
+      { emoji: '😿', title: '呜呜～', sub: '没关系，再来一次～' },
+      { emoji: '🥺', title: '好可惜！', sub: '宝贝再努力一次！' },
+      { emoji: '🌸', title: '好厉害！', sub: '你是最棒的小公主！' },
+      { emoji: '👑', title: '无敌了！', sub: '我男朋友一定很爱你～' },
+    ];
+    const tier = score < 50 ? 0 : score < 150 ? 1 : score < 300 ? 2 : 3;
+    const msg = messages[tier];
+
+    document.getElementById('overEmoji').textContent = msg.emoji;
+    document.getElementById('overTitle').textContent = msg.title;
+    document.getElementById('overSub').textContent = msg.sub;
+    document.getElementById('finalScore').textContent = score;
+    document.getElementById('finalBest').textContent = bestScore;
+    document.getElementById('finalCaught').textContent = catchedHearts;
+
+    gameOverScreen.classList.remove('hidden');
+  }
+
+  // ============ INIT ============
+  document.getElementById('btnStart').addEventListener('click', startGame);
+  document.getElementById('btnRestart').addEventListener('click', startGame);
+
+  // Start collision loop
+  requestAnimationFrame(checkCollisions);
+
+  // Generate clouds
+  for (let i = 0; i < 5; i++) {
+    const c = document.createElement('div');
+    c.classList.add('cloud');
+    const size = 60 + Math.random() * 80;
+    c.style.width = size + 'px';
+    c.style.height = (size * 0.4) + 'px';
+    c.style.top = (5 + Math.random() * 30) + '%';
+    c.style.animationDuration = (18 + Math.random() * 20) + 's';
+    c.style.animationDelay = (-Math.random() * 20) + 's';
+    c.style.opacity = 0.4 + Math.random() * 0.3;
+    document.body.appendChild(c);
+  }
+
+  // Show best score from localStorage
+  try {
+    const saved = localStorage.getItem('loveGameBest');
+    if (saved) { bestScore = parseInt(saved); bestDisplay.textContent = bestScore; }
+  } catch(e) {}
+
+  // Save best score
+  setInterval(() => {
+    try { localStorage.setItem('loveGameBest', bestScore); } catch(e) {}
+  }, 3000);
+</script>
+</body>
+</html>
