@@ -198,15 +198,15 @@
   /* Falling items */
   .item {
     position: absolute;
-    font-size: 2.2rem;
+    left: 0;
+    top: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     pointer-events: none;
-    animation: fall linear forwards;
     filter: drop-shadow(0 3px 6px rgba(0,0,0,0.12));
     transform-origin: center;
-  }
-  @keyframes fall {
-    from { top: -60px; transform: rotate(-15deg) scale(1); }
-    to { top: 110vh; transform: rotate(15deg) scale(0.9); }
+    will-change: transform;
   }
 
   /* Player basket */
@@ -563,9 +563,12 @@
   let gameRunning = false;
   let items = [];
 
-  const getW = () => window.innerWidth;
-  const getH = () => window.innerHeight;
-  let collisionRAF = null;
+  // 统一使用实时窗口尺寸，避免移动端旋转屏幕、浏览器地址栏变化后坐标错位。
+  const getW = () => window.innerWidth || document.documentElement.clientWidth;
+  const getH = () => window.innerHeight || document.documentElement.clientHeight;
+
+  let gameRAF = null;
+  let lastFrameTime = 0;
 
   // Item types: emoji, points, isBad, size
   const goodItems = [
@@ -587,7 +590,17 @@
     { e: '😈', pts: 0 },
   ];
 
+  function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+  }
+
   function startGame() {
+    // 防止快速连点开始/重开导致多个计时器和动画帧并发。
+    stopGameLoop();
+    clearTimeout(spawnTimer);
+    clearInterval(diffTimer);
+    clearTimeout(comboTimer);
+
     score = 0; lives = 3; level = 1; combo = 0; catchedHearts = 0;
     playerX = getW() / 2;
     items = [];
@@ -603,20 +616,20 @@
 
     updateHUD();
     updateHearts();
-    player.style.left = playerX + 'px';
+    movePlayerTo(playerX);
 
-    startCollisionLoop();
+    startGameLoop();
     scheduleSpawn();
     startDiffRamp();
   }
 
   function scheduleSpawn() {
     if (!gameRunning) return;
-    const delay = Math.max(400, 1100 - level * 60);
+    const delay = Math.max(380, 1050 - level * 60);
     spawnTimer = setTimeout(() => {
       spawnItem();
       scheduleSpawn();
-    }, delay + Math.random() * 300);
+    }, delay + Math.random() * 260);
   }
 
   function startDiffRamp() {
@@ -634,87 +647,142 @@
     const pool = isBad ? badItems : goodItems;
     const type = pool[Math.floor(Math.random() * pool.length)];
 
+    const size = 44 + Math.random() * 10;
+    const x = 16 + Math.random() * Math.max(1, getW() - size - 32);
+    const speed = 220 + level * 34 + Math.random() * 45;
+
     const el = document.createElement('div');
     el.classList.add('item');
     el.textContent = type.e;
-
-    const x = 30 + Math.random() * (getW() - 60);
-    const dur = Math.max(1.5, 3.8 - level * 0.22);
-
-    el.style.left = x + 'px';
-    el.style.animationDuration = dur + 's';
-    el.style.fontSize = (2 + Math.random() * 0.6) + 'rem';
+    el.style.width = size + 'px';
+    el.style.height = size + 'px';
+    el.style.fontSize = (size * 0.72) + 'px';
+    el.style.lineHeight = size + 'px';
     el.dataset.pts = type.pts;
     el.dataset.bad = isBad ? '1' : '0';
-    el.dataset.x = x;
 
+    // 不再依赖 CSS @keyframes 的 top/transform 动画；所有位置由 JS 单一循环驱动。
+    el.__fall = {
+      x,
+      y: -size - 12,
+      size,
+      speed,
+      angle: -15 + Math.random() * 30,
+      rotateSpeed: -24 + Math.random() * 48,
+      scale: 0.94 + Math.random() * 0.12
+    };
+
+    renderItem(el);
     gameArea.appendChild(el);
     items.push(el);
-
-    el.addEventListener('animationend', () => {
-      el.remove();
-      items = items.filter(i => i !== el);
-    });
   }
 
-  // ============ COLLISION ============
-  function startCollisionLoop() {
-    if (collisionRAF !== null) return;
-    collisionRAF = requestAnimationFrame(checkCollisions);
+  function renderItem(item) {
+    const s = item.__fall;
+    item.style.transform = `translate3d(${s.x}px, ${s.y}px, 0) rotate(${s.angle}deg) scale(${s.scale})`;
   }
 
-  function stopCollisionLoop() {
-    if (collisionRAF !== null) {
-      cancelAnimationFrame(collisionRAF);
-      collisionRAF = null;
+  // ============ MAIN LOOP + COLLISION ============
+  function startGameLoop() {
+    if (gameRAF !== null) return;
+    lastFrameTime = performance.now();
+    gameRAF = requestAnimationFrame(gameLoop);
+  }
+
+  function stopGameLoop() {
+    if (gameRAF !== null) {
+      cancelAnimationFrame(gameRAF);
+      gameRAF = null;
     }
   }
 
-  function checkCollisions() {
-    collisionRAF = null;
+  function gameLoop(now) {
+    gameRAF = null;
     if (!gameRunning) return;
 
-    collisionRAF = requestAnimationFrame(checkCollisions);
+    const dt = Math.min(0.05, Math.max(0.001, (now - lastFrameTime) / 1000));
+    lastFrameTime = now;
 
-    const catchZone = player.querySelector('.catch-zone');
-    const catchRect = catchZone.getBoundingClientRect();
+    updateItemsAndCollisions(dt);
 
-    // 适当放大接住区域，避免 emoji 视觉边界和 DOM 边界不完全一致导致“看着碰到了但没判定”
-    const catchBox = {
-      left: catchRect.left - 10,
-      right: catchRect.right + 10,
-      top: catchRect.top - 18,
-      bottom: catchRect.bottom + 12
-    };
+    if (gameRunning) {
+      gameRAF = requestAnimationFrame(gameLoop);
+    }
+  }
+
+  function updateItemsAndCollisions(dt) {
+    const catchBox = getCatchBox();
 
     for (const item of [...items]) {
-      const rect = item.getBoundingClientRect();
+      const s = item.__fall;
+      if (!s) continue;
 
-      const hit =
-        rect.left < catchBox.right &&
-        rect.right > catchBox.left &&
-        rect.top < catchBox.bottom &&
-        rect.bottom > catchBox.top;
+      s.y += s.speed * dt;
+      s.angle += s.rotateSpeed * dt;
+      renderItem(item);
 
-      if (hit) {
-        const itemCX = rect.left + rect.width / 2;
-        const itemCY = rect.top + rect.height / 2;
-        const isBad = item.dataset.bad === '1';
-        const pts = parseInt(item.dataset.pts, 10) || 0;
+      // 用自己的物理坐标计算碰撞，不再依赖动画状态下的 getBoundingClientRect()。
+      // emoji 的实际可见区域比 DOM 方块小，略收窄掉落物盒子，提升手感。
+      const insetX = s.size * 0.18;
+      const insetY = s.size * 0.12;
+      const itemBox = {
+        left: s.x + insetX,
+        right: s.x + s.size - insetX,
+        top: s.y + insetY,
+        bottom: s.y + s.size - insetY
+      };
 
-        item.remove();
-        items = items.filter(i => i !== item);
+      if (isIntersecting(itemBox, catchBox)) {
+        handleItemCollision(item, s.x + s.size / 2, s.y + s.size / 2);
+        continue;
+      }
 
-        if (isBad) {
-          onHitBad(item, itemCX, itemCY);
-        } else {
-          onCatch(item, pts, itemCX, itemCY);
-        }
+      if (s.y > getH() + 80) {
+        removeItem(item);
       }
     }
   }
 
-  function onCatch(item, pts, cx, cy) {
+  function getCatchBox() {
+    const catchZone = player.querySelector('.catch-zone');
+    const rect = catchZone.getBoundingClientRect();
+
+    // 接住区域按真实接盘条扩展，不按小猫头部判定；这里调大一点，避免手机端 emoji 视觉边界误差。
+    return {
+      left: rect.left - 28,
+      right: rect.right + 28,
+      top: rect.top - 46,
+      bottom: rect.bottom + 18
+    };
+  }
+
+  function isIntersecting(a, b) {
+    return a.left < b.right &&
+           a.right > b.left &&
+           a.top < b.bottom &&
+           a.bottom > b.top;
+  }
+
+  function handleItemCollision(item, cx, cy) {
+    const isBad = item.dataset.bad === '1';
+    const pts = parseInt(item.dataset.pts, 10) || 0;
+    const emoji = item.textContent;
+
+    removeItem(item);
+
+    if (isBad) {
+      onHitBad(cx, cy);
+    } else {
+      onCatch(emoji, pts, cx, cy);
+    }
+  }
+
+  function removeItem(item) {
+    item.remove();
+    items = items.filter(i => i !== item);
+  }
+
+  function onCatch(emoji, pts, cx, cy) {
     combo++;
     catchedHearts++;
     clearTimeout(comboTimer);
@@ -725,7 +793,7 @@
     updateHUD();
 
     // Burst effect
-    spawnBurst(item.textContent, cx, cy - 30);
+    spawnBurst(emoji, cx, cy - 30);
     spawnScorePop('+' + gained + (multiplier > 1 ? '✕' + multiplier : ''), cx, cy - 50, '#ff4d6d');
 
     // Show combo
@@ -743,7 +811,7 @@
     }, 1800);
   }
 
-  function onHitBad(item, cx, cy) {
+  function onHitBad(cx, cy) {
     combo = 0;
     comboDisplay.classList.remove('show');
     lives--;
@@ -782,21 +850,38 @@
     setTimeout(() => el.remove(), 900);
   }
 
-  // ============ TOUCH CONTROLS ============
+  // ============ INPUT CONTROLS ============
+  function movePlayerTo(clientX) {
+    playerX = clamp(clientX, 44, getW() - 44);
+    player.style.left = playerX + 'px';
+  }
+
+  function handlePointerInput(e) {
+    if (!gameRunning) return;
+    if (e.cancelable) e.preventDefault();
+    movePlayerTo(e.clientX);
+  }
+
+  // Pointer 事件同时覆盖鼠标、触控笔和现代移动端触摸。
+  document.addEventListener('pointerdown', handlePointerInput, { passive: false });
+  document.addEventListener('pointermove', handlePointerInput, { passive: false });
+
+  // 保留 touch 兜底，兼容少数旧移动 WebView。
   document.addEventListener('touchmove', (e) => {
     if (!gameRunning) return;
     e.preventDefault();
-    const tx = e.touches[0].clientX;
-    playerX = Math.max(44, Math.min(getW() - 44, tx));
-    player.style.left = playerX + 'px';
+    if (e.touches.length > 0) movePlayerTo(e.touches[0].clientX);
   }, { passive: false });
 
   document.addEventListener('touchstart', (e) => {
     if (!gameRunning) return;
-    const tx = e.touches[0].clientX;
-    playerX = Math.max(44, Math.min(getW() - 44, tx));
-    player.style.left = playerX + 'px';
+    if (e.touches.length > 0) movePlayerTo(e.touches[0].clientX);
   }, { passive: false });
+
+  window.addEventListener('resize', () => {
+    if (!gameRunning) return;
+    movePlayerTo(playerX ?? getW() / 2);
+  });
 
   // ============ HUD ============
   function updateHUD() {
@@ -829,7 +914,7 @@
   // ============ GAME OVER ============
   function endGame() {
     gameRunning = false;
-    stopCollisionLoop();
+    stopGameLoop();
     clearTimeout(spawnTimer);
     clearInterval(diffTimer);
     clearTimeout(comboTimer);
@@ -860,8 +945,6 @@
   document.getElementById('btnStart').addEventListener('click', startGame);
   document.getElementById('btnRestart').addEventListener('click', startGame);
 
-  // 碰撞循环在 startGame() 内启动，避免页面初始化时因 gameRunning=false 提前退出。
-
   // Generate clouds
   for (let i = 0; i < 5; i++) {
     const c = document.createElement('div');
@@ -879,7 +962,7 @@
   // Show best score from localStorage
   try {
     const saved = localStorage.getItem('loveGameBest');
-    if (saved) { bestScore = parseInt(saved); bestDisplay.textContent = bestScore; }
+    if (saved) { bestScore = parseInt(saved, 10) || 0; bestDisplay.textContent = bestScore; }
   } catch(e) {}
 
   // Save best score
