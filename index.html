@@ -563,8 +563,9 @@
   let gameRunning = false;
   let items = [];
 
-  const W = window.innerWidth;
-  const H = window.innerHeight;
+  const getW = () => window.innerWidth;
+  const getH = () => window.innerHeight;
+  let collisionRAF = null;
 
   // Item types: emoji, points, isBad, size
   const goodItems = [
@@ -588,7 +589,7 @@
 
   function startGame() {
     score = 0; lives = 3; level = 1; combo = 0; catchedHearts = 0;
-    playerX = W / 2;
+    playerX = getW() / 2;
     items = [];
     gameRunning = true;
 
@@ -601,8 +602,10 @@
     gameArea.classList.remove('hidden');
 
     updateHUD();
+    updateHearts();
     player.style.left = playerX + 'px';
 
+    startCollisionLoop();
     scheduleSpawn();
     startDiffRamp();
   }
@@ -635,7 +638,7 @@
     el.classList.add('item');
     el.textContent = type.e;
 
-    const x = 30 + Math.random() * (W - 60);
+    const x = 30 + Math.random() * (getW() - 60);
     const dur = Math.max(1.5, 3.8 - level * 0.22);
 
     el.style.left = x + 'px';
@@ -655,30 +658,50 @@
   }
 
   // ============ COLLISION ============
-  function checkCollisions() {
-    if (!gameRunning) return;
-    requestAnimationFrame(checkCollisions);
+  function startCollisionLoop() {
+    if (collisionRAF !== null) return;
+    collisionRAF = requestAnimationFrame(checkCollisions);
+  }
 
-    const playerRect = {
-      x: playerX - 42,
-      y: H - 74,
-      w: 84,
-      h: 18
+  function stopCollisionLoop() {
+    if (collisionRAF !== null) {
+      cancelAnimationFrame(collisionRAF);
+      collisionRAF = null;
+    }
+  }
+
+  function checkCollisions() {
+    collisionRAF = null;
+    if (!gameRunning) return;
+
+    collisionRAF = requestAnimationFrame(checkCollisions);
+
+    const catchZone = player.querySelector('.catch-zone');
+    const catchRect = catchZone.getBoundingClientRect();
+
+    // 适当放大接住区域，避免 emoji 视觉边界和 DOM 边界不完全一致导致“看着碰到了但没判定”
+    const catchBox = {
+      left: catchRect.left - 10,
+      right: catchRect.right + 10,
+      top: catchRect.top - 18,
+      bottom: catchRect.bottom + 12
     };
 
     for (const item of [...items]) {
       const rect = item.getBoundingClientRect();
-      const itemCX = rect.left + rect.width / 2;
-      const itemCY = rect.top + rect.height / 2;
 
-      if (
-        itemCX > playerRect.x &&
-        itemCX < playerRect.x + playerRect.w &&
-        itemCY > playerRect.y &&
-        itemCY < playerRect.y + playerRect.h + 12
-      ) {
+      const hit =
+        rect.left < catchBox.right &&
+        rect.right > catchBox.left &&
+        rect.top < catchBox.bottom &&
+        rect.bottom > catchBox.top;
+
+      if (hit) {
+        const itemCX = rect.left + rect.width / 2;
+        const itemCY = rect.top + rect.height / 2;
         const isBad = item.dataset.bad === '1';
-        const pts = parseInt(item.dataset.pts);
+        const pts = parseInt(item.dataset.pts, 10) || 0;
+
         item.remove();
         items = items.filter(i => i !== item);
 
@@ -764,14 +787,14 @@
     if (!gameRunning) return;
     e.preventDefault();
     const tx = e.touches[0].clientX;
-    playerX = Math.max(44, Math.min(W - 44, tx));
+    playerX = Math.max(44, Math.min(getW() - 44, tx));
     player.style.left = playerX + 'px';
   }, { passive: false });
 
   document.addEventListener('touchstart', (e) => {
     if (!gameRunning) return;
     const tx = e.touches[0].clientX;
-    playerX = Math.max(44, Math.min(W - 44, tx));
+    playerX = Math.max(44, Math.min(getW() - 44, tx));
     player.style.left = playerX + 'px';
   }, { passive: false });
 
@@ -806,8 +829,10 @@
   // ============ GAME OVER ============
   function endGame() {
     gameRunning = false;
+    stopCollisionLoop();
     clearTimeout(spawnTimer);
     clearInterval(diffTimer);
+    clearTimeout(comboTimer);
 
     hud.classList.add('hidden');
     gameArea.classList.add('hidden');
@@ -835,8 +860,7 @@
   document.getElementById('btnStart').addEventListener('click', startGame);
   document.getElementById('btnRestart').addEventListener('click', startGame);
 
-  // Start collision loop
-  requestAnimationFrame(checkCollisions);
+  // 碰撞循环在 startGame() 内启动，避免页面初始化时因 gameRunning=false 提前退出。
 
   // Generate clouds
   for (let i = 0; i < 5; i++) {
